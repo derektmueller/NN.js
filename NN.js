@@ -27,8 +27,20 @@ NN.prototype.J = function (Theta) {
 
 };
 
-NN.prototype.activation = function (z) {
-
+/**
+ * Sigmoid activation
+ */
+NN.prototype.g = function (X, Theta) {
+    console.log ('Theta = ');
+    console.log (Theta);
+    console.log ('X = ');
+    console.log (X);
+    return 1 / (1 + Math.pow (
+        Math.E, 
+        -math.multiply (
+            Theta, 
+            X
+        )));
 };
 
 /**
@@ -48,6 +60,7 @@ NN.prototype.checkGradient = function () {
 };
 
 /**
+ * Initialize parameters to random values in [-epsilon, epsilon)
  * @return Array
  */
 NN.prototype.initTheta = function (epsilon) {
@@ -59,7 +72,7 @@ NN.prototype.initTheta = function (epsilon) {
         count += this.S[i] * this.S[i + 1];
     }
 
-    // randomly initialize parameters to values in [-epsilon, epsilon)
+    // randomly initialize parameters
     var Theta = [];
     for (var i = 0; i < count; i++) {
         Theta.push (Math.random () * 2 * epsilon - epsilon);
@@ -68,6 +81,7 @@ NN.prototype.initTheta = function (epsilon) {
 };
 
 /**
+ * Convert vector of parameters into parameter matrices
  * @param Array unrolled parameters
  * @return Array resized parameters
  */
@@ -80,10 +94,8 @@ NN.prototype.reshapeParams = function (Theta) {
         elementCount = this.S[i] * this.S[i + 1];
         elements = Theta.slice (0, elementCount); 
         Theta = Theta.slice (elementCount);
-        console.log ('elements = ');
-        console.log (elements);
         reshaped.push (
-            this.reshape (elements, [this.S[i], this.S[i + 1]]));
+            this.reshape (elements, [this.S[i + 1], this.S[i]]));
     }
     return reshaped;
 };
@@ -117,9 +129,13 @@ return NN;
 if (typeof module !== 'undefined') module.exports = NN;
 
 GLOBAL.test = function () {
+    // test param initialization
     var nn = new NN ([2, 5, 2]);
     nn.initTheta ();
     console.log ('nn.Theta = ');
     console.log (nn.Theta);
+
+    // test activation
+    console.log (nn.g ([1, 1], nn.Theta[0][0]));
 };
 
