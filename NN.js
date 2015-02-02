@@ -16,15 +16,49 @@ function NN (S) {
  * @param Array X
  */
 NN.prototype.h = function (X) {
-
+    return this.forwardProp (X);
 };
 
 /**
  * Cost function
  * @param Array Theta
  */
-NN.prototype.J = function (Theta) {
-
+NN.prototype.J = function () {
+    var cost = 0, 
+        hypothesis,
+        ex,
+        x,
+        y;
+    for (var i in this.trainingSet) {
+        ex = this.trainingSet[i];
+        x = ex[0];
+        y = ex[1];
+        hypothesis = this.h (x);
+        cost = math.add (
+            cost,
+            math.add (
+                math.multiply (
+                    y,
+                    math.log (
+                        hypothesis
+                    )
+                ),
+                math.multiply (
+                    math.subtract (
+                        1,
+                        y
+                    ),
+                    math.log (
+                        math.subtract (
+                            1,
+                            hypothesis
+                        )
+                    )
+                )
+            )
+        );
+    }
+    return cost;
 };
 
 /**
@@ -151,6 +185,25 @@ return NN;
 if (typeof module !== 'undefined') module.exports = NN;
 
 GLOBAL.test = function () {
+
+    // test cost function
+    (function () {
+        var nn = new NN ([2, 1]);
+        nn.Theta = [[-30, 20, 20]]; // AND params
+        nn.trainingSet = [
+            [[0, 0], 0],
+            [[0, 1], 0],
+            [[1, 0], 0],
+            [[1, 1], 1],
+        ];
+        console.log (nn.J ());
+        nn.Theta = [[10, -20, -20]]; // NAND params
+        console.log (nn.J ());
+        nn.Theta = [[-10, 20, 20]]; // OR params
+        console.log (nn.J ());
+    }) ();
+
+    return;
 
     // basic functionality test
     (function () {
