@@ -9,6 +9,7 @@ function NN (S) {
     this.L = this.S.length;
     this.trainingSet = [];    
     this.Theta = [];    
+    this.lambda = 0.001;
 };
 
 /**
@@ -17,6 +18,13 @@ function NN (S) {
  */
 NN.prototype.h = function (X) {
     return this.forwardProp (X);
+};
+
+NN.prototype.getRegularizationTerm = function () {
+    return math.multiply (
+        this.lambda / (2 * this.trainingSet.length),
+        math.sum (math.square (this.unrollParams (true)))
+    );
 };
 
 /**
@@ -58,6 +66,10 @@ NN.prototype.J = function () {
             )
         );
     }
+    cost = math.add (
+        cost,
+        this.getRegularizationTerm ()
+    );
     return cost;
 };
 
@@ -134,6 +146,19 @@ NN.prototype.initTheta = function (epsilon) {
         Theta.push (Math.random () * 2 * epsilon - epsilon);
     }
     this.Theta = this.reshapeParams (Theta);
+};
+
+NN.prototype.unrollParams = function (excludeBiasUnits) {
+    excludeBiasUnits = typeof excludeBiasUnits === 'undefined' ? 
+        false : excludeBiasUnits; 
+    var unrolled = [];
+    for (var i in this.Theta) {
+        for (var j in this.Theta[i]) {
+            if (excludeBiasUnits && j === 0) continue;
+            unrolled.push (this.Theta[i][j]); 
+        }
+    }
+    return unrolled;
 };
 
 /**
