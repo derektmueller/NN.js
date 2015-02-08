@@ -11,26 +11,28 @@ function NN (S) {
     this.S = S; 
     this.L = this.S.length; // number of layers
     this.trainingSet = [];    
-    this.Theta = []; // parameters   
     this.lambda = 0.001; // regularization term
     this.a = []; // activations
 };
 
 /**
- * Hypothesis function
+ * Hypothesis function getter
  * @param Array X
  */
-NN.prototype.h = function (X) {
-    return this.forwardProp (X);
+NN.prototype.getH = function (Theta) {
+    var that = this;
+    return function (X) {
+        return that.forwardProp (Theta, X);
+    };
 };
 
 /**
  * Get regularization term of cost function
  */
-NN.prototype.getRegularizationTerm = function () {
+NN.prototype.getRegularizationTerm = function (Theta) {
     return math.multiply (
         this.lambda / (2 * this.trainingSet.length),
-        math.sum (math.square (this.unrollParams (true)))
+        math.sum (math.square (this.unrollParams (Theta, true)))
     );
 };
 
@@ -38,9 +40,10 @@ NN.prototype.getRegularizationTerm = function () {
  * Cost function
  * @param Array Theta
  */
-NN.prototype.J = function () {
+NN.prototype.J = function (Theta) {
     var cost = 0, 
-        hypothesis,
+        h = this.getH (Theta),
+        hVal,
         ex,
         x,
         y;
@@ -48,14 +51,14 @@ NN.prototype.J = function () {
         ex = this.trainingSet[i];
         x = ex[0];
         y = ex[1];
-        hypothesis = this.h (x);
+        hVal = h (x);
         cost = math.add (
             cost,
             math.add (
                 math.multiply (
                     y,
                     math.log (
-                        hypothesis
+                        hVal
                     )
                 ),
                 math.multiply (
@@ -66,7 +69,7 @@ NN.prototype.J = function () {
                     math.log (
                         math.subtract (
                             1,
-                            hypothesis
+                            hVal
                         )
                     )
                 )
@@ -79,7 +82,7 @@ NN.prototype.J = function () {
     );
     cost = math.add (
         cost,
-        this.getRegularizationTerm ()
+        this.getRegularizationTerm (Theta)
     );
     return cost;
 };
@@ -89,14 +92,30 @@ NN.prototype.J = function () {
  */
 NN.prototype.g = function (X, Theta) {
     if (X instanceof Array) {
-        return 1 / (1 + Math.pow (
-            Math.E, 
-            -math.multiply (
-                Theta, 
-                X
-            )));
+        return math.divide (
+            1,
+            math.add (
+                1, 
+                math.pow (
+                    Math.E, 
+                    -math.multiply (
+                        Theta, 
+                        X
+                    )
+                )
+            )
+        );
     } else {
-        return 1 / (1 + Math.pow (Math.E, -X));
+        return math.divide (
+            1,
+            math.add (
+                1, 
+                math.pow (
+                    Math.E, 
+                    -X
+                )
+            )
+        );
     }
 };
 
@@ -115,7 +134,7 @@ NN.prototype.map = function (x, callback) {
  * @param Array X training example
  * @return Array hypothesis
  */
-NN.prototype.forwardProp = function (X, i) {
+NN.prototype.forwardProp = function (Theta, X, i) {
     i = typeof i === 'undefined' ? this.L - 2 : i; 
     if (i === -1) {
         this.a[i + 1] = X;
@@ -127,8 +146,8 @@ NN.prototype.forwardProp = function (X, i) {
     //   console.log ([1].concat (this.forwardProp (X, i - 1)));
         this.a[i + 1] = this.map (
             math.multiply (
-                this.Theta[i], 
-                this.forwardProp (X, i - 1)
+                Theta[i], 
+                this.forwardProp (Theta, X, i - 1)
             ), function (elem) {
                 return that.g (elem);
             });
@@ -144,7 +163,7 @@ NN.prototype.forwardProp = function (X, i) {
  * Helpfer function for backProp which recursively calculates error 
  * terms for each neuron
  */
-NN.prototype.getErrorTerms = function (y, delta, i) {
+NN.prototype.getErrorTerms = function (Theta, y, delta, i) {
 //    console.log ('delta = ');
 //    console.log (delta);
     if (typeof i === 'undefined') {
@@ -162,7 +181,7 @@ NN.prototype.getErrorTerms = function (y, delta, i) {
 //        console.log (math.transpose (this.Theta[i]));
         delta = [math.multiply (
             math.multiply (
-                math.transpose (this.Theta[i]),
+                math.transpose (Theta[i]),
                 i === this.S.length - 2 ? 
                     delta[0] :
                     delta[0].slice (1) // remove bias error unit
@@ -178,10 +197,10 @@ NN.prototype.getErrorTerms = function (y, delta, i) {
     }
 //    console.log ('i = ');
 //    console.log (i);
-    return this.getErrorTerms (y, delta, i - 1);
+    return this.getErrorTerms (Theta, y, delta, i - 1);
 };
 
-NN.prototype.backProp = function () {
+NN.prototype.backProp = function (Theta) {
     // initialize partial derivative values at 0
     var Delta = [];
     for (var i = 0; i < this.S.length - 1; i++) {
@@ -199,26 +218,39 @@ NN.prototype.backProp = function () {
     var ex, delta;
     for (var i in this.trainingSet) {
         ex = this.trainingSet[i];
-        this.forwardProp (ex[0]); // calculate activation values
+        this.forwardProp (Theta, ex[0]); // calculate activation values
 //        console.log ('this.a = ');
 //        console.log (this.a);
 //        console.log ('ex[1] = ');
 //        console.log (ex[1]);
-        delta = this.getErrorTerms (ex[1]);
+        delta = this.getErrorTerms (Theta, ex[1]);
 //        console.log ('delta = ');
 //        console.log (delta);
         for (var j = 0; j < this.S.length - 1; j++) {
+//            console.log ('j = ');
+//            console.log (j);
+//            console.log ('Delta[j]');
+//            console.log (Delta[j]);
+//           console.log ('delta[j] = ');
+//            console.log (delta[j].slice (j === this.S.length - 2 ? 0 : 1).
+//                map (function (elem) {
+//                    return [elem];
+//                }));
             Delta[j] = math.add (
                 Delta[j],
                 math.multiply (
-                    delta[j],
-                    math.transpose (this.a[j + 1])
+                    delta[j].slice (j === this.S.length - 2 ? 0 : 1).
+                        map (function (elem) {
+                            return [elem];
+                        }),
+                    [this.a[j]]
                 )
             );
         }
         //console.log ('Delta = ');
         //console.log (Delta);
     }
+    //console.log ("\n");
     //console.log ('Delta = ');
     //console.log (Delta);
     for (var i = 0; i < this.S.length - 1; i++) {
@@ -229,7 +261,7 @@ NN.prototype.backProp = function () {
             ),
             math.multiply (
                 this.lambda,
-                this.Theta[i].map (function (row) { // remove bias params
+                Theta[i].map (function (row) { // remove bias params
                     return [0].concat (row.slice (1));
                 })
             )
@@ -238,6 +270,37 @@ NN.prototype.backProp = function () {
     //console.log ('Delta = ');
     //console.log (Delta);
     return Delta;
+};
+
+NN.prototype.gradApprox = function (Theta, epsilon) {
+    epsilon = typeof epsilon === 'undefined' ? 0.0001 : epsilon; 
+    var unrolled = this.unrollParams (Theta),
+        gradApprox = [],
+        thetaPlus,
+        thetaMinus;
+   //console.log ('unrollParams = ');
+   //console.log (unrolled);
+
+    for (var i in unrolled) {
+        thetaPlus = unrolled.slice ()
+        thetaMinus = unrolled.slice ()
+        thetaPlus[i] = math.add (thetaPlus[i], epsilon);
+        thetaMinus[i] = math.subtract (thetaMinus[i], epsilon);
+//        console.log (this.reshapeParams (thetaPlus));
+//        console.log (this.reshapeParams (thetaMinus));
+//        console.log (this.J (this.reshapeParams (thetaPlus)));
+//        console.log (this.J (this.reshapeParams (thetaMinus)));
+        gradApprox[i] = math.divide (
+            math.subtract (
+                this.J (this.reshapeParams (thetaPlus)),
+                this.J (this.reshapeParams (thetaMinus))
+            ),
+            2 * epsilon
+        )[0];
+    }
+    //console.log ('gradApprox = ');
+    //console.log (gradApprox);
+    return this.reshapeParams (gradApprox);
 };
 
 NN.prototype.checkGradient = function () {
@@ -262,17 +325,19 @@ NN.prototype.initTheta = function (epsilon) {
     for (var i = 0; i < count; i++) {
         Theta.push (Math.random () * 2 * epsilon - epsilon);
     }
-    this.Theta = this.reshapeParams (Theta);
+    return this.reshapeParams (Theta);
 };
 
-NN.prototype.unrollParams = function (excludeBiasUnits) {
+NN.prototype.unrollParams = function (Theta, excludeBiasUnits) {
     excludeBiasUnits = typeof excludeBiasUnits === 'undefined' ? 
         false : excludeBiasUnits; 
     var unrolled = [];
-    for (var i in this.Theta) {
-        for (var j in this.Theta[i]) {
-            if (excludeBiasUnits && j === 0) continue;
-            unrolled.push (this.Theta[i][j]); 
+    for (var i in Theta) {
+        for (var j in Theta[i]) {
+            for (var k in Theta[i][j]) {
+                if (excludeBiasUnits && k === 0) continue;
+                unrolled.push (Theta[i][j][k]); 
+            }
         }
     }
     return unrolled;
@@ -331,59 +396,66 @@ GLOBAL.test = function () {
     // test back prop
     (function () {
         var nn = new NN ([2, 2, 1]); // XNOR network
-        nn.Theta = [
-            [[-30, 20, 20], [10, -20, -20]],
-            [[-10, 20, 20]]
+        var Theta = [
+            [[1, 1, 1], [0, 0, 0]],
+            [[0, 0, 0]]
         ];
+        //var Theta = nn.initTheta ();
         nn.trainingSet = [
+//            [[20, 0], 0],
+//            [[20, 5], 0],
+//            [[25, 5], 0],
+//            [[0, 0], 0],
             [[0, 0], 1],
             [[0, 1], 0],
             [[1, 0], 0],
             [[1, 1], 1],
         ];
-        nn.backProp ();
+        console.log (nn.backProp (Theta));
+        console.log (nn.gradApprox (Theta));
     }) ();
     return;
 
-    // test cost function
-    (function () {
-        var nn = new NN ([2, 1]);
-        nn.Theta = [[-30, 20, 20]]; // AND params
-        nn.trainingSet = [
-            [[0, 0], 0],
-            [[0, 1], 0],
-            [[1, 0], 0],
-            [[1, 1], 1],
-        ];
-        console.log (nn.J ());
-        nn.Theta = [[10, -20, -20]]; // NAND params
-        console.log (nn.J ());
-        nn.Theta = [[-10, 20, 20]]; // OR params
-        console.log (nn.J ());
-    }) ();
+//    // test cost function
+//    (function () {
+//        var nn = new NN ([2, 1]);
+//        nn.trainingSet = [
+//            [[0, 0], 0],
+//            [[0, 1], 0],
+//            [[1, 0], 0],
+//            [[1, 1], 1],
+//        ];
+//        var Theta = [[[-30, 20, 20]]]; // AND params
+//        console.log (nn.J (Theta));
+//        Theta = [[[10, -20, -20]]]; // NAND params
+//        console.log (nn.J (Theta));
+//        Theta = [[[-10, 20, 20]]]; // OR params
+//        console.log (nn.J (Theta));
+//    }) ();
+//    return;
 
-    return;
-
-    // basic functionality test
-    (function () {
-        // test param initialization
-        var nn = new NN ([2, 2, 1]);
-        nn.initTheta ();
-        console.log ('nn.Theta = ');
-        console.log (nn.Theta);
-        // test activation function
-        console.log (nn.g ([1, 1, 1], nn.Theta[0][0]));
-    } ());
+//    // basic functionality test
+//    (function () {
+//        // test param initialization
+//        var nn = new NN ([2, 2, 1]);
+//        var Theta = nn.initTheta ();
+//        console.log ('Theta = ');
+//        console.log (Theta);
+//        // test activation function
+//        console.log (nn.g ([1, 1, 1], Theta[0][0]));
+//    } ());
+//    return;
 
     // AND network
     (function () {
         var nn = new NN ([2, 1]);
-        nn.Theta = [[-30, 20, 20]];
-        console.log (nn.forwardProp ([0, 0]));
-        console.log (nn.forwardProp ([0, 1]));
-        console.log (nn.forwardProp ([1, 0]));
-        console.log (nn.forwardProp ([1, 1]));
+        var Theta = [[-30, 20, 20]];
+        console.log (nn.forwardProp (Theta, [0, 0]));
+        console.log (nn.forwardProp (Theta, [0, 1]));
+        console.log (nn.forwardProp (Theta, [1, 0]));
+        console.log (nn.forwardProp (Theta, [1, 1]));
     }) ();
+    return;
 
     // NAND network
     (function () {
