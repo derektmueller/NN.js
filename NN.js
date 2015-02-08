@@ -4,12 +4,16 @@ if (typeof require !== 'undefined') var math = require ('mathjs');
 
 var NN = (function () {
 
+/**
+ * @param Array S units per layer
+ */
 function NN (S) {
-    this.S = S; // units per layer
-    this.L = this.S.length;
+    this.S = S; 
+    this.L = this.S.length; // number of layers
     this.trainingSet = [];    
-    this.Theta = [];    
-    this.lambda = 0.001;
+    this.Theta = []; // parameters   
+    this.lambda = 0.001; // regularization term
+    this.a = []; // activations
 };
 
 /**
@@ -20,6 +24,9 @@ NN.prototype.h = function (X) {
     return this.forwardProp (X);
 };
 
+/**
+ * Get regularization term of cost function
+ */
 NN.prototype.getRegularizationTerm = function () {
     return math.multiply (
         this.lambda / (2 * this.trainingSet.length),
@@ -66,6 +73,10 @@ NN.prototype.J = function () {
             )
         );
     }
+    cost = math.multiply (
+        -(1 / this.trainingSet.length),
+        cost
+    );
     cost = math.add (
         cost,
         this.getRegularizationTerm ()
@@ -98,6 +109,9 @@ NN.prototype.map = function (x, callback) {
 };
 
 /**
+ * Forward propagate input vector through neural network, saving 
+ * activations of each layer of neurons in the property a. Saved
+ * activation values can are used by back propagation.
  * @param Array X training example
  * @return Array hypothesis
  */
@@ -109,7 +123,7 @@ NN.prototype.forwardProp = function (X, i) {
 //   console.log (this.Theta[i] );
 //   console.log ('[1].concat (this.forwardProp (X, i - 1)) = ');
 //   console.log ([1].concat (this.forwardProp (X, i - 1)));
-    return this.map (
+    this.a[i] = this.map (
         math.multiply (
             this.Theta[i], 
             // add the bias unit
@@ -117,6 +131,7 @@ NN.prototype.forwardProp = function (X, i) {
         ), function (elem) {
             return that.g (elem);
         });
+    return this.a[i];
 };
 
 NN.prototype.backProp = function () {
@@ -237,7 +252,7 @@ GLOBAL.test = function () {
         nn.initTheta ();
         console.log ('nn.Theta = ');
         console.log (nn.Theta);
-        // test activation
+        // test activation function
         console.log (nn.g ([1, 1, 1], nn.Theta[0][0]));
     } ());
 
