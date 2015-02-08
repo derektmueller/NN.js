@@ -13,6 +13,7 @@ function NN (S) {
     this.trainingSet = [];    
     this.lambda = 0.001; // regularization term
     this.a = []; // activations
+    this.enableRegularization = false;
 };
 
 /**
@@ -54,7 +55,7 @@ NN.prototype.J = function (Theta) {
         hVal = h (x);
         cost = math.add (
             cost,
-            math.add (
+            math.sum (math.add (
                 math.multiply (
                     y,
                     math.log (
@@ -73,17 +74,18 @@ NN.prototype.J = function (Theta) {
                         )
                     )
                 )
-            )
+            ))
         );
     }
     cost = math.multiply (
         -(1 / this.trainingSet.length),
         cost
     );
-    cost = math.add (
-        cost,
-        this.getRegularizationTerm (Theta)
-    );
+    if (this.enableRegularization)
+        cost = math.add (
+            cost,
+            this.getRegularizationTerm (Theta)
+        );
     return cost;
 };
 
@@ -219,10 +221,10 @@ NN.prototype.backProp = function (Theta) {
     for (var i in this.trainingSet) {
         ex = this.trainingSet[i];
         this.forwardProp (Theta, ex[0]); // calculate activation values
-//        console.log ('this.a = ');
-//        console.log (this.a);
-//        console.log ('ex[1] = ');
-//        console.log (ex[1]);
+        console.log ('this.a = ');
+        console.log (this.a);
+        console.log ('ex[1] = ');
+        console.log (ex[1]);
         delta = this.getErrorTerms (Theta, ex[1]);
 //        console.log ('delta = ');
 //        console.log (delta);
@@ -254,24 +256,34 @@ NN.prototype.backProp = function (Theta) {
     //console.log ('Delta = ');
     //console.log (Delta);
     for (var i = 0; i < this.S.length - 1; i++) {
-        Delta[i] = math.add (
-            math.multiply (
+        if (this.enableRegularization) {
+            Delta[i] = math.add (
+                math.multiply (
+                    1 / this.trainingSet.length,
+                    Delta[i]
+                ),
+                math.multiply (
+                    this.lambda,
+                    Theta[i].map (function (row) { // remove bias params
+                        return [0].concat (row.slice (1));
+                    })
+                )
+            );
+        } else {
+            Delta[i] = math.multiply (
                 1 / this.trainingSet.length,
                 Delta[i]
-            ),
-            math.multiply (
-                this.lambda,
-                Theta[i].map (function (row) { // remove bias params
-                    return [0].concat (row.slice (1));
-                })
-            )
-        );
+            );
+        }
     }
     //console.log ('Delta = ');
     //console.log (Delta);
     return Delta;
 };
 
+/**
+ * Calculate gradient approximation
+ */
 NN.prototype.gradApprox = function (Theta, epsilon) {
     epsilon = typeof epsilon === 'undefined' ? 0.0001 : epsilon; 
     var unrolled = this.unrollParams (Theta),
@@ -296,7 +308,7 @@ NN.prototype.gradApprox = function (Theta, epsilon) {
                 this.J (this.reshapeParams (thetaMinus))
             ),
             2 * epsilon
-        )[0];
+        );
     }
     //console.log ('gradApprox = ');
     //console.log (gradApprox);
@@ -397,8 +409,8 @@ GLOBAL.test = function () {
     (function () {
         var nn = new NN ([2, 2, 1]); // XNOR network
         var Theta = [
-            [[1, 1, 1], [0, 0, 0]],
-            [[0, 0, 0]]
+            [[-30, 20, 20], [10, -20, -20]],
+            [[-10, 20, 20]]
         ];
         //var Theta = nn.initTheta ();
         nn.trainingSet = [
