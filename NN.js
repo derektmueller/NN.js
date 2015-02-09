@@ -12,9 +12,9 @@ function NN (S) {
     this.S = S; 
     this.L = this.S.length; // number of layers
     this.trainingSet = [];    
-    this.lambda = 0.001; // regularization term
+    this.lambda = 0.0001; // regularization term
     this.a = []; // activations
-    this.enableRegularization = false;
+    this.enableRegularization = true;
 };
 
 NN.getElem = function (i) {
@@ -38,6 +38,12 @@ NN.prototype.getH = function (Theta) {
  * Get regularization term of cost function
  */
 NN.prototype.getRegularizationTerm = function (Theta) {
+//    console.log ('getRegularizationTerm');
+//    console.log ('Theta = ');
+//    console.log (Theta);
+//    console.log (this.unrollParams (Theta, true));
+//    console.log (math.square (this.unrollParams (Theta, true)));
+//    console.log (math.sum (math.square (this.unrollParams (Theta, true))));
     return math.multiply (
         this.lambda / (2 * this.trainingSet.length),
         math.sum (math.square (this.unrollParams (Theta, true)))
@@ -264,13 +270,39 @@ NN.prototype.backProp = function (Theta) {
     //console.log (Delta);
     for (var i = 0; i < this.S.length - 1; i++) {
         if (this.enableRegularization) {
+//           console.log ('Delta[i] = ');
+//           console.log (Delta[i]);
+//            console.log ('this.lambda, = ');
+//            console.log (this.lambda);
+//            console.log (Theta[i].map (function (row) { 
+//                return [0].concat (row.slice (1));
+//            }));
+//            console.log (math.multiply (
+//                this.lambda,
+//                Theta[i].map (function (row) { // remove bias params
+//                    return [0].concat (row.slice (1));
+//                })
+//            ));
+//            console.log (math.add (
+//                Delta[i],
+//                math.multiply (
+//                    this.lambda,
+//                    Theta[i].map (function (row) { // remove bias params
+//                        return [0].concat (row.slice (1));
+//                    })
+//                )
+//            ));
+//            console.log (math.multiply (
+//                1 / this.trainingSet.length,
+//                Delta[i]
+//            ));
             Delta[i] = math.add (
                 math.multiply (
                     1 / this.trainingSet.length,
                     Delta[i]
                 ),
                 math.multiply (
-                    this.lambda,
+                    (this.lambda / this.trainingSet.length),
                     Theta[i].map (function (row) { // remove bias params
                         return [0].concat (row.slice (1));
                     })
@@ -457,6 +489,7 @@ GLOBAL.test = function () {
     // test gradApprox
     (function () {
         var nn = new NN ([2, 1]);
+        nn.enableRegularization = false;
         nn.trainingSet = [
             [[0, 0], 1],
             [[0, 0], 1],
@@ -493,6 +526,7 @@ GLOBAL.test = function () {
     // test 2 layer backProp
     (function () {
         var nn = new NN ([2, 1]);
+        nn.enableRegularization = false;
         nn.trainingSet = [
             [[0, 0], 0],
             [[1, 0], 0],
@@ -531,6 +565,30 @@ GLOBAL.test = function () {
     // test back prop with hidden layer
     (function () {
         var nn = new NN ([2, 2, 1]); // XNOR network
+        nn.enableRegularization = false;
+        var Theta = [
+            [[-30, 20, 20], [10, -20, -20]],
+            [[-10, 20, 20]]
+        ];
+        var Theta = nn.initTheta ();
+        nn.trainingSet = [
+            [[0, 0], 1],
+            [[0, 1], 0],
+            [[1, 0], 0],
+            [[1, 1], 1],
+        ];
+        var Delta = nn.backProp (Theta);
+        var gradApprox = nn.gradApprox (Theta);
+        assert (
+            math.number (
+                nn.getRelativeDifference (gradApprox, Delta)) <
+            Math.pow (10, -9)
+        );
+    }) ();
+    // test back prop with hidden layer with regularization
+    (function () {
+        var nn = new NN ([2, 2, 1]); // XNOR network
+        nn.enableRegularization = true;
         var Theta = [
             [[-30, 20, 20], [10, -20, -20]],
             [[-10, 20, 20]]
