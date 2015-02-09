@@ -1,7 +1,12 @@
 #!/usr/bin/node
 
-if (typeof require !== 'undefined') var math = require ('mathjs');
-if (typeof require !== 'undefined') var assert = require ('assert');
+if (typeof require !== 'undefined') {
+    var math = require ('mathjs');
+    var assert = require ('assert');
+} else {
+    var math = mathjs;
+    var assert = console.assert;
+}
 
 var NN = (function () {
 
@@ -12,9 +17,10 @@ function NN (S) {
     this.S = S; 
     this.L = this.S.length; // number of layers
     this.trainingSet = [];    
-    this.lambda = 0.0001; // regularization term
+    this.lambda = 0.001; // regularization term
     this.a = []; // activations
     this.enableRegularization = true;
+    this.enableGradientChecking = true;
 };
 
 NN.getElem = function (i) {
@@ -315,6 +321,10 @@ NN.prototype.backProp = function (Theta) {
             );
         }
     }
+
+    if (this.enableGradientChecking) {
+        this.checkGradient (Theta, Delta);
+    }
     //console.log ('Delta = ');
     //console.log (Delta);
     return Delta;
@@ -373,8 +383,21 @@ NN.prototype.getRelativeDifference = function (gradApprox, gradient) {
     );
 };
 
-NN.prototype.checkGradient = function () {
-
+/**
+ * Asserts that gradient closely matches approximation
+ */
+NN.prototype.checkGradient = function (Theta, gradient) {
+    var gradApprox = this.gradApprox (Theta);
+    var relativeDiff = this.getRelativeDifference (gradApprox, gradient);
+//    console.log ('gradApprox = ');
+//    console.log (gradApprox);
+//    console.log ('gradient = ');
+//    console.log (gradient);
+    assert (
+        math.number (
+            this.getRelativeDifference (gradApprox, gradient)) <
+        Math.pow (10, -9)
+    );
 };
 
 /**
@@ -398,6 +421,9 @@ NN.prototype.initTheta = function (epsilon) {
     return this.reshapeParams (Theta);
 };
 
+/**
+ * Convert matrices of parameters into a parameter vector
+ */
 NN.prototype.unrollParams = function (Theta, excludeBiasUnits) {
     excludeBiasUnits = typeof excludeBiasUnits === 'undefined' ? 
         false : excludeBiasUnits; 
@@ -450,8 +476,32 @@ NN.prototype.reshape = function (arr, dimensions) {
     return reshaped;
 };
 
-NN.prototype.gradientDescent = function () {
-
+/**
+ * Train parameters on training set
+ * @param Number iterations number of iterations of gradient descent
+ * @param Number alpha the learning rate
+ */
+NN.prototype.gradientDescent = function (iterations, alpha) {
+    iterations = typeof iterations === 'undefined' ? 1000 : iterations; 
+    alpha = typeof alpha === 'undefined' ? 0.01 : alpha; 
+    var Theta = this.initTheta (), 
+        unrolled,
+        h,
+        m = this.trainingSet.length;
+    for (var i = 0; i < iterations; i++) {
+        h = this.getH (Theta);
+        unrolled = this.unrollParams (Theta);
+        unrolled = math.subtract (
+            unrolled, 
+            math.multiply (
+                alpha,
+                this.unrollParams (this.backProp (Theta))
+            )
+        );
+        Theta = this.reshapeParams (unrolled);
+        //console.log (this.J (Theta));
+    }
+    return Theta;
 };
 
 
@@ -463,150 +513,171 @@ if (typeof module !== 'undefined') module.exports = NN;
 
 GLOBAL.test = function () {
     
-    // test reshape
-    (function () {
-        var nn = new NN ([]);
-        var arr = [1, 2, 3, 4];
-        var reshaped =  nn.reshape (arr, [2, 2]);
-        assert.deepEqual ([[1, 2], [3, 4]], reshaped);
-    }) ();
-    // test param unroll
-    (function () {
-        var nn = new NN ([2, 2, 1]);
-        var Theta = [[[1, 2, 3], [4, 5, 6]], [[7, 8, 9]]];
-        var unrolled = nn.unrollParams (Theta);
-        assert.deepEqual ([1, 2, 3, 4, 5, 6, 7, 8, 9], unrolled);
-        var unrolled = nn.unrollParams (Theta, true);
-        assert.deepEqual ([2, 3, 5, 6, 8, 9], unrolled);
-    }) ();
-    // test reshape params
-    (function () {
-        var nn = new NN ([2, 2, 1]);
-        var Theta = [[[1, 2, 3], [4, 5, 6]], [[7, 8, 9]]];
-        var unrolled = nn.unrollParams (Theta);
-        assert.deepEqual (Theta, nn.reshapeParams (unrolled));
-    }) ();
-    // test gradApprox
-    (function () {
-        var nn = new NN ([2, 1]);
-        nn.enableRegularization = false;
-        nn.trainingSet = [
-            [[0, 0], 1],
-            [[0, 0], 1],
-            [[0, 0], 1],
-            [[0, 0], 1],
-            [[0, 0], 1],
-            [[0, 0], 1],
-            [[0, 0], 1]
-        ];
-        var Theta = [[[1, 2, 3]]];
-        var h = nn.getH (Theta);
-        var gradient = [math.multiply (
-            1 / nn.trainingSet.length,
-            math.multiply (
-                math.transpose (
-                    math.subtract (
-                        nn.trainingSet.map (NN.getElem (0)).map (h), 
-                        nn.trainingSet.map (NN.getElem (1))
-                    )
-                ),
-                nn.trainingSet.map (NN.getElem (0)).map (
-                    function (elem) {
-                        return [1].concat (elem);
-                    })
-            )
-        )];
-        var gradApprox = nn.gradApprox (Theta);
-        assert (
-            math.number (
-                nn.getRelativeDifference (gradApprox, gradient)) <
-            Math.pow (10, -9)
-        );
-    }) ();
-    // test 2 layer backProp
-    (function () {
-        var nn = new NN ([2, 1]);
-        nn.enableRegularization = false;
-        nn.trainingSet = [
-            [[0, 0], 0],
-            [[1, 0], 0],
-            [[5, 0], 1],
-            [[0, 1], 0],
-            [[0, 0], 1],
-            [[1, 1], 0],
-            [[0, 0], 1]
-        ];
-        var Theta = [[[1, 2, 3]]];
-        var h = nn.getH (Theta);
-        var gradient = [math.multiply (
-            1 / nn.trainingSet.length,
-            math.multiply (
-                math.transpose (
-                    math.subtract (
-                        nn.trainingSet.map (NN.getElem (0)).map (h), 
-                        nn.trainingSet.map (NN.getElem (1))
-                    )
-                ),
-                nn.trainingSet.map (NN.getElem (0)).map (
-                    function (elem) {
-                        return [1].concat (elem);
-                    })
-            )
-        )];
-        var Delta = nn.backProp (Theta);
-        var gradApprox = nn.gradApprox (Theta);
-        assert.deepEqual (gradient, Delta);
-        assert (
-            math.number (
-                nn.getRelativeDifference (gradApprox, Delta)) <
-            Math.pow (10, -9)
-        );
-    }) ();
-    // test back prop with hidden layer
+//    // test reshape
+//    (function () {
+//        var nn = new NN ([]);
+//        var arr = [1, 2, 3, 4];
+//        var reshaped =  nn.reshape (arr, [2, 2]);
+//        assert.deepEqual ([[1, 2], [3, 4]], reshaped);
+//    }) ();
+//    // test param unroll
+//    (function () {
+//        var nn = new NN ([2, 2, 1]);
+//        var Theta = [[[1, 2, 3], [4, 5, 6]], [[7, 8, 9]]];
+//        var unrolled = nn.unrollParams (Theta);
+//        assert.deepEqual ([1, 2, 3, 4, 5, 6, 7, 8, 9], unrolled);
+//        var unrolled = nn.unrollParams (Theta, true);
+//        assert.deepEqual ([2, 3, 5, 6, 8, 9], unrolled);
+//    }) ();
+//    // test reshape params
+//    (function () {
+//        var nn = new NN ([2, 2, 1]);
+//        var Theta = [[[1, 2, 3], [4, 5, 6]], [[7, 8, 9]]];
+//        var unrolled = nn.unrollParams (Theta);
+//        assert.deepEqual (Theta, nn.reshapeParams (unrolled));
+//    }) ();
+//    // test gradApprox
+//    (function () {
+//        var nn = new NN ([2, 1]);
+//        nn.enableRegularization = false;
+//        nn.trainingSet = [
+//            [[0, 0], 1],
+//            [[0, 0], 1],
+//            [[0, 0], 1],
+//            [[0, 0], 1],
+//            [[0, 0], 1],
+//            [[0, 0], 1],
+//            [[0, 0], 1]
+//        ];
+//        var Theta = [[[1, 2, 3]]];
+//        var h = nn.getH (Theta);
+//        var gradient = [math.multiply (
+//            1 / nn.trainingSet.length,
+//            math.multiply (
+//                math.transpose (
+//                    math.subtract (
+//                        nn.trainingSet.map (NN.getElem (0)).map (h), 
+//                        nn.trainingSet.map (NN.getElem (1))
+//                    )
+//                ),
+//                nn.trainingSet.map (NN.getElem (0)).map (
+//                    function (elem) {
+//                        return [1].concat (elem);
+//                    })
+//            )
+//        )];
+//        var gradApprox = nn.gradApprox (Theta);
+//        assert (
+//            math.number (
+//                nn.getRelativeDifference (gradApprox, gradient)) <
+//            Math.pow (10, -9)
+//        );
+//    }) ();
+//    // test 2 layer backProp
+//    (function () {
+//        var nn = new NN ([2, 1]);
+//        nn.enableRegularization = false;
+//        nn.trainingSet = [
+//            [[0, 0], 0],
+//            [[1, 0], 0],
+//            [[5, 0], 1],
+//            [[0, 1], 0],
+//            [[0, 0], 1],
+//            [[1, 1], 0],
+//            [[0, 0], 1]
+//        ];
+//        var Theta = [[[1, 2, 3]]];
+//        var h = nn.getH (Theta);
+//        var gradient = [math.multiply (
+//            1 / nn.trainingSet.length,
+//            math.multiply (
+//                math.transpose (
+//                    math.subtract (
+//                        nn.trainingSet.map (NN.getElem (0)).map (h), 
+//                        nn.trainingSet.map (NN.getElem (1))
+//                    )
+//                ),
+//                nn.trainingSet.map (NN.getElem (0)).map (
+//                    function (elem) {
+//                        return [1].concat (elem);
+//                    })
+//            )
+//        )];
+//        var Delta = nn.backProp (Theta);
+//        var gradApprox = nn.gradApprox (Theta);
+//        assert.deepEqual (gradient, Delta);
+//        assert (
+//            math.number (
+//                nn.getRelativeDifference (gradApprox, Delta)) <
+//            Math.pow (10, -9)
+//        );
+//    }) ();
+//    // test back prop with hidden layer
+//    (function () {
+//        var nn = new NN ([2, 2, 1]); // XNOR network
+//        nn.enableRegularization = false;
+//        var Theta = [
+//            [[-30, 20, 20], [10, -20, -20]],
+//            [[-10, 20, 20]]
+//        ];
+//        var Theta = nn.initTheta ();
+//        nn.trainingSet = [
+//            [[0, 0], 1],
+//            [[0, 1], 0],
+//            [[1, 0], 0],
+//            [[1, 1], 1],
+//        ];
+//        var Delta = nn.backProp (Theta);
+//        var gradApprox = nn.gradApprox (Theta);
+//        assert (
+//            math.number (
+//                nn.getRelativeDifference (gradApprox, Delta)) <
+//            Math.pow (10, -9)
+//        );
+//    }) ();
+//    // test back prop with hidden layer with regularization
+//    (function () {
+//        var nn = new NN ([2, 2, 1]); // XNOR network
+//        nn.enableRegularization = true;
+//        var Theta = [
+//            [[-30, 20, 20], [10, -20, -20]],
+//            [[-10, 20, 20]]
+//        ];
+//        var Theta = nn.initTheta ();
+//        nn.trainingSet = [
+//            [[0, 0], 1],
+//            [[0, 1], 0],
+//            [[1, 0], 0],
+//            [[1, 1], 1],
+//        ];
+//        var Delta = nn.backProp (Theta);
+//        var gradApprox = nn.gradApprox (Theta);
+//        assert (
+//            math.number (
+//                nn.getRelativeDifference (gradApprox, Delta)) <
+//            Math.pow (10, -9)
+//        );
+//    }) ();
+    // test gradient descent
     (function () {
         var nn = new NN ([2, 2, 1]); // XNOR network
-        nn.enableRegularization = false;
-        var Theta = [
-            [[-30, 20, 20], [10, -20, -20]],
-            [[-10, 20, 20]]
-        ];
-        var Theta = nn.initTheta ();
+        nn.enableGradientChecking = false;
         nn.trainingSet = [
             [[0, 0], 1],
             [[0, 1], 0],
             [[1, 0], 0],
             [[1, 1], 1],
         ];
-        var Delta = nn.backProp (Theta);
-        var gradApprox = nn.gradApprox (Theta);
-        assert (
-            math.number (
-                nn.getRelativeDifference (gradApprox, Delta)) <
-            Math.pow (10, -9)
-        );
-    }) ();
-    // test back prop with hidden layer with regularization
-    (function () {
-        var nn = new NN ([2, 2, 1]); // XNOR network
-        nn.enableRegularization = true;
-        var Theta = [
-            [[-30, 20, 20], [10, -20, -20]],
-            [[-10, 20, 20]]
-        ];
-        var Theta = nn.initTheta ();
-        nn.trainingSet = [
-            [[0, 0], 1],
-            [[0, 1], 0],
-            [[1, 0], 0],
-            [[1, 1], 1],
-        ];
-        var Delta = nn.backProp (Theta);
-        var gradApprox = nn.gradApprox (Theta);
-        assert (
-            math.number (
-                nn.getRelativeDifference (gradApprox, Delta)) <
-            Math.pow (10, -9)
-        );
+        var Theta = nn.gradientDescent (10000, 10);
+        var h = nn.getH (Theta);
+//        console.log (h ([0, 0]));
+//        console.log (h ([0, 1]));
+//        console.log (h ([1, 0]));
+//        console.log (h ([1, 1]));
+        assert (h ([0, 0])[0] >= 0.5);
+        assert (h ([0, 1])[0] < 0.5);
+        assert (h ([1, 0])[0] < 0.5);
+        assert (h ([1, 1])[0] >= 0.5);
     }) ();
     return;
 
