@@ -1,6 +1,7 @@
 #!/usr/bin/node
 
 if (typeof require !== 'undefined') var math = require ('mathjs');
+if (typeof require !== 'undefined') var assert = require ('assert');
 
 var NN = (function () {
 
@@ -14,6 +15,12 @@ function NN (S) {
     this.lambda = 0.001; // regularization term
     this.a = []; // activations
     this.enableRegularization = false;
+};
+
+NN.getElem = function (i) {
+    return function (a) {
+        return a[i];
+    }
 };
 
 /**
@@ -181,14 +188,14 @@ NN.prototype.getErrorTerms = function (Theta, y, delta, i) {
     } else {
 //        console.log ('math.transpose (this.Theta[i]) = ');
 //        console.log (math.transpose (this.Theta[i]));
-        delta = [math.multiply (
+        delta = [math.dotMultiply (
             math.multiply (
                 math.transpose (Theta[i]),
                 i === this.S.length - 2 ? 
                     delta[0] :
                     delta[0].slice (1) // remove bias error unit
             ),
-            math.multiply (
+            math.dotMultiply (
                 this.a[i],
                 math.subtract (
                     1,
@@ -221,10 +228,10 @@ NN.prototype.backProp = function (Theta) {
     for (var i in this.trainingSet) {
         ex = this.trainingSet[i];
         this.forwardProp (Theta, ex[0]); // calculate activation values
-        console.log ('this.a = ');
-        console.log (this.a);
-        console.log ('ex[1] = ');
-        console.log (ex[1]);
+//        console.log ('this.a = ');
+//        console.log (this.a);
+//        console.log ('ex[1] = ');
+//        console.log (ex[1]);
         delta = this.getErrorTerms (Theta, ex[1]);
 //        console.log ('delta = ');
 //        console.log (delta);
@@ -315,6 +322,25 @@ NN.prototype.gradApprox = function (Theta, epsilon) {
     return this.reshapeParams (gradApprox);
 };
 
+NN.prototype.getRelativeDifference = function (gradApprox, gradient) {
+    var unrolledGradApprox = this.unrollParams (gradApprox);
+    var unrolledGradient = this.unrollParams (gradient);
+    return math.divide (
+        math.norm (
+            math.subtract (
+                unrolledGradApprox,
+                unrolledGradient
+            )
+        ),
+        math.norm (
+            math.add (
+                unrolledGradApprox,
+                unrolledGradient
+            )
+        )
+    );
+};
+
 NN.prototype.checkGradient = function () {
 
 };
@@ -347,7 +373,7 @@ NN.prototype.unrollParams = function (Theta, excludeBiasUnits) {
     for (var i in Theta) {
         for (var j in Theta[i]) {
             for (var k in Theta[i][j]) {
-                if (excludeBiasUnits && k === 0) continue;
+                if (excludeBiasUnits && k == 0) continue;
                 unrolled.push (Theta[i][j][k]); 
             }
         }
@@ -404,27 +430,125 @@ return NN;
 if (typeof module !== 'undefined') module.exports = NN;
 
 GLOBAL.test = function () {
-
-    // test back prop
+    
+    // test reshape
+    (function () {
+        var nn = new NN ([]);
+        var arr = [1, 2, 3, 4];
+        var reshaped =  nn.reshape (arr, [2, 2]);
+        assert.deepEqual ([[1, 2], [3, 4]], reshaped);
+    }) ();
+    // test param unroll
+    (function () {
+        var nn = new NN ([2, 2, 1]);
+        var Theta = [[[1, 2, 3], [4, 5, 6]], [[7, 8, 9]]];
+        var unrolled = nn.unrollParams (Theta);
+        assert.deepEqual ([1, 2, 3, 4, 5, 6, 7, 8, 9], unrolled);
+        var unrolled = nn.unrollParams (Theta, true);
+        assert.deepEqual ([2, 3, 5, 6, 8, 9], unrolled);
+    }) ();
+    // test reshape params
+    (function () {
+        var nn = new NN ([2, 2, 1]);
+        var Theta = [[[1, 2, 3], [4, 5, 6]], [[7, 8, 9]]];
+        var unrolled = nn.unrollParams (Theta);
+        assert.deepEqual (Theta, nn.reshapeParams (unrolled));
+    }) ();
+    // test gradApprox
+    (function () {
+        var nn = new NN ([2, 1]);
+        nn.trainingSet = [
+            [[0, 0], 1],
+            [[0, 0], 1],
+            [[0, 0], 1],
+            [[0, 0], 1],
+            [[0, 0], 1],
+            [[0, 0], 1],
+            [[0, 0], 1]
+        ];
+        var Theta = [[[1, 2, 3]]];
+        var h = nn.getH (Theta);
+        var gradient = [math.multiply (
+            1 / nn.trainingSet.length,
+            math.multiply (
+                math.transpose (
+                    math.subtract (
+                        nn.trainingSet.map (NN.getElem (0)).map (h), 
+                        nn.trainingSet.map (NN.getElem (1))
+                    )
+                ),
+                nn.trainingSet.map (NN.getElem (0)).map (
+                    function (elem) {
+                        return [1].concat (elem);
+                    })
+            )
+        )];
+        var gradApprox = nn.gradApprox (Theta);
+        assert (
+            math.number (
+                nn.getRelativeDifference (gradApprox, gradient)) <
+            Math.pow (10, -9)
+        );
+    }) ();
+    // test 2 layer backProp
+    (function () {
+        var nn = new NN ([2, 1]);
+        nn.trainingSet = [
+            [[0, 0], 0],
+            [[1, 0], 0],
+            [[5, 0], 1],
+            [[0, 1], 0],
+            [[0, 0], 1],
+            [[1, 1], 0],
+            [[0, 0], 1]
+        ];
+        var Theta = [[[1, 2, 3]]];
+        var h = nn.getH (Theta);
+        var gradient = [math.multiply (
+            1 / nn.trainingSet.length,
+            math.multiply (
+                math.transpose (
+                    math.subtract (
+                        nn.trainingSet.map (NN.getElem (0)).map (h), 
+                        nn.trainingSet.map (NN.getElem (1))
+                    )
+                ),
+                nn.trainingSet.map (NN.getElem (0)).map (
+                    function (elem) {
+                        return [1].concat (elem);
+                    })
+            )
+        )];
+        var Delta = nn.backProp (Theta);
+        var gradApprox = nn.gradApprox (Theta);
+        assert.deepEqual (gradient, Delta);
+        assert (
+            math.number (
+                nn.getRelativeDifference (gradApprox, Delta)) <
+            Math.pow (10, -9)
+        );
+    }) ();
+    // test back prop with hidden layer
     (function () {
         var nn = new NN ([2, 2, 1]); // XNOR network
         var Theta = [
             [[-30, 20, 20], [10, -20, -20]],
             [[-10, 20, 20]]
         ];
-        //var Theta = nn.initTheta ();
+        var Theta = nn.initTheta ();
         nn.trainingSet = [
-//            [[20, 0], 0],
-//            [[20, 5], 0],
-//            [[25, 5], 0],
-//            [[0, 0], 0],
             [[0, 0], 1],
             [[0, 1], 0],
             [[1, 0], 0],
             [[1, 1], 1],
         ];
-        console.log (nn.backProp (Theta));
-        console.log (nn.gradApprox (Theta));
+        var Delta = nn.backProp (Theta);
+        var gradApprox = nn.gradApprox (Theta);
+        assert (
+            math.number (
+                nn.getRelativeDifference (gradApprox, Delta)) <
+            Math.pow (10, -9)
+        );
     }) ();
     return;
 
@@ -458,49 +582,49 @@ GLOBAL.test = function () {
 //    } ());
 //    return;
 
-    // AND network
-    (function () {
-        var nn = new NN ([2, 1]);
-        var Theta = [[-30, 20, 20]];
-        console.log (nn.forwardProp (Theta, [0, 0]));
-        console.log (nn.forwardProp (Theta, [0, 1]));
-        console.log (nn.forwardProp (Theta, [1, 0]));
-        console.log (nn.forwardProp (Theta, [1, 1]));
-    }) ();
-    return;
-
-    // NAND network
-    (function () {
-        var nn = new NN ([2, 1]);
-        nn.Theta = [[10, -20, -20]];
-        console.log (nn.forwardProp ([0, 0]));
-        console.log (nn.forwardProp ([0, 1]));
-        console.log (nn.forwardProp ([1, 0]));
-        console.log (nn.forwardProp ([1, 1]));
-    }) ();
-
-    // OR network
-    (function () {
-        var nn = new NN ([2, 1]);
-        nn.Theta = [[-10, 20, 20]];
-        console.log (nn.forwardProp ([0, 0]));
-        console.log (nn.forwardProp ([0, 1]));
-        console.log (nn.forwardProp ([1, 0]));
-        console.log (nn.forwardProp ([1, 1]));
-    }) ();
-
-    // XNOR network
-    (function () {
-        // test param initialization
-        var nn = new NN ([2, 2, 1]);
-        nn.Theta = [
-            [[-30, 20, 20], [10, -20, -20]],
-            [[-10, 20, 20]]
-        ];
-        console.log (nn.forwardProp ([0, 0]));
-        console.log (nn.forwardProp ([0, 1]));
-        console.log (nn.forwardProp ([1, 0]));
-        console.log (nn.forwardProp ([1, 1]));
-    }) ();
+//    // AND network
+//    (function () {
+//        var nn = new NN ([2, 1]);
+//        var Theta = [[-30, 20, 20]];
+//        console.log (nn.forwardProp (Theta, [0, 0]));
+//        console.log (nn.forwardProp (Theta, [0, 1]));
+//        console.log (nn.forwardProp (Theta, [1, 0]));
+//        console.log (nn.forwardProp (Theta, [1, 1]));
+//    }) ();
+//    return;
+//
+//    // NAND network
+//    (function () {
+//        var nn = new NN ([2, 1]);
+//        nn.Theta = [[10, -20, -20]];
+//        console.log (nn.forwardProp ([0, 0]));
+//        console.log (nn.forwardProp ([0, 1]));
+//        console.log (nn.forwardProp ([1, 0]));
+//        console.log (nn.forwardProp ([1, 1]));
+//    }) ();
+//
+//    // OR network
+//    (function () {
+//        var nn = new NN ([2, 1]);
+//        nn.Theta = [[-10, 20, 20]];
+//        console.log (nn.forwardProp ([0, 0]));
+//        console.log (nn.forwardProp ([0, 1]));
+//        console.log (nn.forwardProp ([1, 0]));
+//        console.log (nn.forwardProp ([1, 1]));
+//    }) ();
+//
+//    // XNOR network
+//    (function () {
+//        // test param initialization
+//        var nn = new NN ([2, 2, 1]);
+//        nn.Theta = [
+//            [[-30, 20, 20], [10, -20, -20]],
+//            [[-10, 20, 20]]
+//        ];
+//        console.log (nn.forwardProp ([0, 0]));
+//        console.log (nn.forwardProp ([0, 1]));
+//        console.log (nn.forwardProp ([1, 0]));
+//        console.log (nn.forwardProp ([1, 1]));
+//    }) ();
 };
 
