@@ -181,7 +181,7 @@ NN.prototype.forwardProp = function (Theta, X, i) {
 };
 
 /**
- * Helpfer function for backProp which recursively calculates error 
+ * Helper function for backProp which recursively calculates error 
  * terms for each neuron
  */
 NN.prototype.getErrorTerms = function (Theta, y, delta, i) {
@@ -221,6 +221,9 @@ NN.prototype.getErrorTerms = function (Theta, y, delta, i) {
     return this.getErrorTerms (Theta, y, delta, i - 1);
 };
 
+/**
+ * Computes partial derivatives of cost function J
+ */
 NN.prototype.backProp = function (Theta) {
     // initialize partial derivative values at 0
     var Delta = [];
@@ -364,6 +367,10 @@ NN.prototype.gradApprox = function (Theta, epsilon) {
     return this.reshapeParams (gradApprox);
 };
 
+/**
+ * Calculate relative difference between gradient and gradient 
+ * approximation
+ */
 NN.prototype.getRelativeDifference = function (gradApprox, gradient) {
     var unrolledGradApprox = this.unrollParams (gradApprox);
     var unrolledGradient = this.unrollParams (gradient);
@@ -660,7 +667,8 @@ GLOBAL.test = function () {
 //    }) ();
     // test gradient descent
     (function () {
-        var nn = new NN ([2, 2, 1]); // XNOR network
+        // train an XNOR network
+        var nn = new NN ([2, 2, 1]); 
         nn.enableGradientChecking = false;
         nn.trainingSet = [
             [[0, 0], 1],
@@ -675,6 +683,42 @@ GLOBAL.test = function () {
 //        console.log (h ([1, 0]));
 //        console.log (h ([1, 1]));
         assert (h ([0, 0])[0] >= 0.5);
+        assert (h ([0, 1])[0] < 0.5);
+        assert (h ([1, 0])[0] < 0.5);
+        assert (h ([1, 1])[0] >= 0.5);
+
+        // train an XOR network
+        nn.trainingSet = [
+            [[0, 0], 0],
+            [[0, 1], 1],
+            [[1, 0], 1],
+            [[1, 1], 0],
+        ];
+        var Theta = nn.gradientDescent (10000, 10);
+        var h = nn.getH (Theta);
+//        console.log (h ([0, 0]));
+//        console.log (h ([0, 1]));
+//        console.log (h ([1, 0]));
+//        console.log (h ([1, 1]));
+        assert (h ([0, 0])[0] < 0.5);
+        assert (h ([0, 1])[0] >= 0.5);
+        assert (h ([1, 0])[0] >= 0.5);
+        assert (h ([1, 1])[0] < 0.5);
+
+        // train an AND network
+        nn.trainingSet = [
+            [[0, 0], 0],
+            [[0, 1], 0],
+            [[1, 0], 0],
+            [[1, 1], 1],
+        ];
+        var Theta = nn.gradientDescent (10000, 10);
+        var h = nn.getH (Theta);
+//        console.log (h ([0, 0]));
+//        console.log (h ([0, 1]));
+//        console.log (h ([1, 0]));
+//        console.log (h ([1, 1]));
+        assert (h ([0, 0])[0] < 0.5);
         assert (h ([0, 1])[0] < 0.5);
         assert (h ([1, 0])[0] < 0.5);
         assert (h ([1, 1])[0] >= 0.5);
