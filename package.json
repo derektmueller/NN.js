@@ -1,0 +1,21 @@
+{
+  "name": "NN.js",
+  "version": "1.0.0",
+  "description": "Feedforward neural network class",
+  "main": "NN.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/parenparen/NN.js"
+  },
+  "author": "Derek Mueller",
+  "bugs": {
+    "url": "https://github.com/parenparen/NN.js/issues"
+  },
+  "homepage": "https://github.com/parenparen/NN.js",
+  "dependencies": {
+    "mathjs": "^1.3.0"
+  }
+}
