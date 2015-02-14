@@ -1,3 +1,25 @@
+#!/usr/bin/node
+
+if (typeof require !== 'undefined') {
+    var math = require ('mathjs');
+    var assert = require ('assert');
+} else {
+    var math = mathjs;
+    var assert = console.assert;
+}
+
+var NN = (function () {
+
+/**
+ * @param Array S units per layer
+ */
+function NN (S) {
+    this.S = S; 
+    this.L = this.S.length; // number of layers
+    this.trainingSet = [];    
+    this.lambda = 0.001; // regularization term
+    this.a = []; // activations
+    this.enableRegularization = true;
     this.enableGradientChecking = true;
 };
 
